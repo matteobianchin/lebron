@@ -1,4 +1,4 @@
-# Lebron Stats App — Full Live Mode ✅ + Bugfix + Migliorie Visive
+# Lebron Stats App — Full Live Mode ✅ + Bugfix + Migliorie Visive + ML e Multi-Giocatoti
 
 import streamlit as st
 import pandas as pd
@@ -46,11 +46,9 @@ current_year = datetime.now().year
 current_season = datetime.now().year if datetime.now().month >= 10 else datetime.now().year - 1
 seasons = [f"{year}-{str(year + 1)[-2:]}" for year in range(2003, current_season + 1)]
 selected_seasons = st.multiselect("Seleziona le stagioni:", seasons, default=seasons[-3:])
-player_name = st.selectbox("Seleziona il giocatore:", list(PLAYERS.keys()))
+player_names = st.multiselect("Seleziona i giocatori:", list(PLAYERS.keys()), default=['LeBron James'])
 team_name = st.selectbox("Seleziona la squadra avversaria:", list(TEAM_ABBREVIATIONS.keys()))
 team_abbr = TEAM_ABBREVIATIONS[team_name]
-player_id = PLAYERS[player_name]['id']
-player_archetype = PLAYERS[player_name]['archetype']
 
 # ================================
 # 🔄 Funzioni di caricamento dati live — fix heatmap
@@ -90,18 +88,23 @@ def load_shot_chart(player_id, season, team_abbr):
         return pd.DataFrame()
 
 # ================================
-# 🚀 Main App Logic
+# 🚀 Main App Logic — multi player + ML predittivo
 # ================================
 
-if selected_seasons:
+if selected_seasons and player_names:
     st.spinner("Caricamento dati in corso...")
 
-    df = load_player_data(player_id, selected_seasons)
     off_rating, def_rating = load_team_ratings(team_abbr)
 
-    if df.empty:
-        st.warning("Nessun dato trovato per il giocatore e le stagioni selezionate.")
-    else:
+    for player_name in player_names:
+        player_id = PLAYERS[player_name]['id']
+        player_archetype = PLAYERS[player_name]['archetype']
+        df = load_player_data(player_id, selected_seasons)
+
+        if df.empty:
+            st.warning(f"Nessun dato trovato per {player_name} nelle stagioni selezionate.")
+            continue
+
         df_team = df[df['MATCHUP'].str.contains(team_abbr)]
         ppg = df_team['PTS'].mean() if not df_team.empty else 0
 
@@ -109,6 +112,17 @@ if selected_seasons:
         st.metric("Media punti a partita", f"{round(ppg, 2)} PPG")
         if off_rating and def_rating:
             st.metric("Off/Def Rating avversario", f"{off_rating} / {def_rating}")
+
+        # 🔥 Machine Learning semplice: previsione punti prossima partita
+        if len(df_team) >= 2:
+            df_team_sorted = df_team.sort_values('GAME_DATE')
+            df_team_sorted['GameNumber'] = range(len(df_team_sorted))
+            X = df_team_sorted[['GameNumber']]
+            y = df_team_sorted['PTS']
+            model = LinearRegression().fit(X, y)
+            next_game = np.array([[len(df_team_sorted)]])
+            prediction = model.predict(next_game)[0]
+            st.metric("📈 Previsione ML Punti Prossima Partita", f"{prediction:.1f} PTS")
 
         st.subheader("📈 Heatmap tiri (Regular Season)")
         for season in selected_seasons:
@@ -137,6 +151,6 @@ if selected_seasons:
         st.dataframe(df_team_formatted[['GAME_DATE', 'PTS', 'AST', 'REB', 'FG_PCT', 'FG3_PCT', 'FT_PCT']])
 
         csv = df_team.to_csv(index=False).encode('utf-8')
-        st.download_button("📥 Scarica dati CSV", csv, "player_vs_team.csv", "text/csv")
+        st.download_button(f"📥 Scarica dati CSV per {player_name}", csv, f"{player_name}_vs_{team_name}.csv", "text/csv")
 
-st.success("✅ Dashboard aggiornata e funzionante in modalità Live!")
+st.success("✅ Dashboard aggiornata e funzionante in modalità Live con Multi-Player e ML!")
