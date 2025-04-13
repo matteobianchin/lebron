@@ -1,4 +1,4 @@
-# Lebron Stats App — Full Live Mode ✅
+# Lebron Stats App — Full Live Mode ✅ + Bugfix + Migliorie Visive
 
 import streamlit as st
 import pandas as pd
@@ -39,10 +39,12 @@ PLAYERS = {
 }
 
 # ================================
-# 📅 Selezioni utente dinamiche
+# 📅 Selezioni utente dinamiche — fix stagioni future
 # ================================
 
-seasons = [f"{year}-{str(year + 1)[-2:]}" for year in range(2003, datetime.now().year + 1)]
+current_year = datetime.now().year
+current_season = datetime.now().year if datetime.now().month >= 10 else datetime.now().year - 1
+seasons = [f"{year}-{str(year + 1)[-2:]}" for year in range(2003, current_season + 1)]
 selected_seasons = st.multiselect("Seleziona le stagioni:", seasons, default=seasons[-3:])
 player_name = st.selectbox("Seleziona il giocatore:", list(PLAYERS.keys()))
 team_name = st.selectbox("Seleziona la squadra avversaria:", list(TEAM_ABBREVIATIONS.keys()))
@@ -51,7 +53,7 @@ player_id = PLAYERS[player_name]['id']
 player_archetype = PLAYERS[player_name]['archetype']
 
 # ================================
-# 🔄 Funzioni di caricamento dati live
+# 🔄 Funzioni di caricamento dati live — fix heatmap
 # ================================
 
 @st.cache_data(show_spinner=True)
@@ -83,9 +85,7 @@ def load_shot_chart(player_id, season, team_abbr):
             season_nullable=season,
             season_type_all_star='Regular Season'
         ).get_data_frames()[0]
-        if team_abbr:
-            shotchart = shotchart[shotchart['OPPONENT_TEAM_ABBREVIATION'] == team_abbr]
-        return shotchart
+        return shotchart[shotchart['OPPONENT_TEAM_ABBREVIATION'] == team_abbr]
     except:
         return pd.DataFrame()
 
@@ -127,7 +127,14 @@ if selected_seasons:
                 st.info(f"Nessun dato tiri disponibile per la stagione {season}.")
 
         st.subheader("📋 Dettaglio partite vs " + team_name)
-        st.dataframe(df_team[['GAME_DATE', 'PTS', 'AST', 'REB', 'FG_PCT', 'FG3_PCT', 'FT_PCT']])
+
+        # Formattiamo le percentuali di tiro in formato %
+        df_team_formatted = df_team.copy()
+        for col in ['FG_PCT', 'FG3_PCT', 'FT_PCT']:
+            if col in df_team_formatted.columns:
+                df_team_formatted[col] = (df_team_formatted[col] * 100).round(1).astype(str) + '%'
+
+        st.dataframe(df_team_formatted[['GAME_DATE', 'PTS', 'AST', 'REB', 'FG_PCT', 'FG3_PCT', 'FT_PCT']])
 
         csv = df_team.to_csv(index=False).encode('utf-8')
         st.download_button("📥 Scarica dati CSV", csv, "player_vs_team.csv", "text/csv")
