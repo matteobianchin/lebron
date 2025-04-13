@@ -1,4 +1,4 @@
-# Lebron Stats App — Full Live Mode ✅ + Bugfix + Migliorie Visive + ML e Multi-Giocatoti
+# Lebron Stats App — Full Live Mode ✅ + Multi-Metrica Confronto Giocatori + Trend + ML Avanzato + Multi Fonte Ready 🚀
 
 import streamlit as st
 import pandas as pd
@@ -15,7 +15,6 @@ import numpy as np
 st.set_page_config(page_title="NBA Player Dashboard Pro", layout="wide")
 st.title("🏀 NBA Player Analytics Dashboard — Live Mode Cloud")
 
-# Lista ufficiale abbreviazioni squadre NBA
 TEAM_ABBREVIATIONS = {
     'Atlanta Hawks': 'ATL', 'Boston Celtics': 'BOS', 'Brooklyn Nets': 'BKN', 'Charlotte Hornets': 'CHA',
     'Chicago Bulls': 'CHI', 'Cleveland Cavaliers': 'CLE', 'Dallas Mavericks': 'DAL', 'Denver Nuggets': 'DEN',
@@ -27,7 +26,6 @@ TEAM_ABBREVIATIONS = {
     'Utah Jazz': 'UTA', 'Washington Wizards': 'WAS'
 }
 
-# Lista giocatori con ID NBA e archetipo
 PLAYERS = {
     'LeBron James': {'id': 2544, 'archetype': 'Playmaking Forward'},
     'Kevin Durant': {'id': 201142, 'archetype': 'Shot Creator'},
@@ -38,20 +36,16 @@ PLAYERS = {
     'Luka Doncic': {'id': 1629029, 'archetype': 'Playmaking Guard'}
 }
 
-# ================================
-# 📅 Selezioni utente dinamiche — fix stagioni future
-# ================================
-
 current_year = datetime.now().year
 current_season = datetime.now().year if datetime.now().month >= 10 else datetime.now().year - 1
 seasons = [f"{year}-{str(year + 1)[-2:]}" for year in range(2003, current_season + 1)]
-selected_seasons = st.multiselect("Seleziona le stagioni:", seasons, default=seasons[-3:])
 player_names = st.multiselect("Seleziona i giocatori:", list(PLAYERS.keys()), default=['LeBron James'])
-team_name = st.selectbox("Seleziona la squadra avversaria:", list(TEAM_ABBREVIATIONS.keys()))
+teams = list(TEAM_ABBREVIATIONS.keys())
+team_name = st.selectbox("Seleziona la squadra avversaria:", teams)
 team_abbr = TEAM_ABBREVIATIONS[team_name]
 
 # ================================
-# 🔄 Funzioni di caricamento dati live — fix heatmap
+# 🔄 Funzioni caricamento dati
 # ================================
 
 @st.cache_data(show_spinner=True)
@@ -87,70 +81,116 @@ def load_shot_chart(player_id, season, team_abbr):
     except:
         return pd.DataFrame()
 
+# 📦 Future Integration Placeholder
+# def load_external_stats():
+#     # Qui integreremo future API come StatMuse o ESPN
+#     return external_data
+
 # ================================
-# 🚀 Main App Logic — multi player + ML predittivo
+# 🚀 Main App Logic — avanzato
 # ================================
 
-if selected_seasons and player_names:
-    st.spinner("Caricamento dati in corso...")
-
+if player_names:
     off_rating, def_rating = load_team_ratings(team_abbr)
 
-    for player_name in player_names:
-        player_id = PLAYERS[player_name]['id']
-        player_archetype = PLAYERS[player_name]['archetype']
-        df = load_player_data(player_id, selected_seasons)
+    st.header(f"📊 Confronto Giocatori — Statistiche vs {team_name}")
 
-        if df.empty:
-            st.warning(f"Nessun dato trovato per {player_name} nelle stagioni selezionate.")
-            continue
+    comparison_data = {metric: {} for metric in ['PPG', 'AST', 'REB', 'FG%', '3P%', 'FT%']}
 
-        df_team = df[df['MATCHUP'].str.contains(team_abbr)]
-        ppg = df_team['PTS'].mean() if not df_team.empty else 0
+    tabs = st.tabs(player_names)
 
-        st.header(f"📊 Statistiche per {player_name} contro {team_name}")
-        st.metric("Media punti a partita", f"{round(ppg, 2)} PPG")
-        if off_rating and def_rating:
-            st.metric("Off/Def Rating avversario", f"{off_rating} / {def_rating}")
+    for tab, player_name in zip(tabs, player_names):
+        with tab:
+            player_id = PLAYERS[player_name]['id']
+            selected_seasons = st.multiselect(f"Seleziona stagioni per {player_name}:", seasons, default=seasons[-3:])
+            df = load_player_data(player_id, selected_seasons)
 
-        # 🔥 Machine Learning semplice: previsione punti prossima partita
-        if len(df_team) >= 2:
-            df_team_sorted = df_team.sort_values('GAME_DATE')
-            df_team_sorted['GameNumber'] = range(len(df_team_sorted))
-            X = df_team_sorted[['GameNumber']]
-            y = df_team_sorted['PTS']
-            model = LinearRegression().fit(X, y)
-            next_game = np.array([[len(df_team_sorted)]])
-            prediction = model.predict(next_game)[0]
-            st.metric("📈 Previsione ML Punti Prossima Partita", f"{prediction:.1f} PTS")
+            if df.empty:
+                st.warning(f"Nessun dato trovato per {player_name} nelle stagioni selezionate.")
+                continue
 
-        st.subheader("📈 Heatmap tiri (Regular Season)")
-        for season in selected_seasons:
-            shotchart = load_shot_chart(player_id, season, team_abbr)
-            if not shotchart.empty:
-                fig, ax = plt.subplots(figsize=(6, 5))
-                made = shotchart[shotchart['SHOT_MADE_FLAG'] == 1]
-                missed = shotchart[shotchart['SHOT_MADE_FLAG'] == 0]
-                ax.scatter(made['LOC_X'], made['LOC_Y'], c='green', label='Canestri', s=10)
-                ax.scatter(missed['LOC_X'], missed['LOC_Y'], c='red', label='Errori', s=10, alpha=0.5)
-                ax.legend()
-                ax.set_title(f"Heatmap Tiri - {season}")
-                ax.axis('off')
+            df_team = df[df['MATCHUP'].str.contains(team_abbr)]
+
+            if not df_team.empty:
+                comparison_data['PPG'][player_name] = df_team['PTS'].mean()
+                comparison_data['AST'][player_name] = df_team['AST'].mean()
+                comparison_data['REB'][player_name] = df_team['REB'].mean()
+                comparison_data['FG%'][player_name] = df_team['FG_PCT'].mean() * 100
+                comparison_data['3P%'][player_name] = df_team['FG3_PCT'].mean() * 100
+                comparison_data['FT%'][player_name] = df_team['FT_PCT'].mean() * 100
+
+            st.subheader(f"Dati per {player_name}")
+            st.metric("Media punti a partita", f"{comparison_data['PPG'].get(player_name, 0):.2f} PPG")
+            if off_rating and def_rating:
+                st.metric("Off/Def Rating avversario", f"{off_rating} / {def_rating}")
+
+            # 📈 Trend stagionale punti
+            if not df_team.empty:
+                st.subheader("📈 Trend punti stagione")
+                df_team_sorted = df_team.sort_values('GAME_DATE')
+                fig, ax = plt.subplots(figsize=(8, 4))
+                ax.plot(df_team_sorted['GAME_DATE'], df_team_sorted['PTS'], marker='o', linestyle='-')
+                ax.set_xlabel("Data Partita")
+                ax.set_ylabel("Punti")
+                ax.set_title(f"Trend Punti - {player_name} vs {team_name}")
+                plt.xticks(rotation=45)
                 st.pyplot(fig)
-            else:
-                st.info(f"Nessun dato tiri disponibile per la stagione {season}.")
 
-        st.subheader("📋 Dettaglio partite vs " + team_name)
+            # 🧠 ML Avanzato: multi-feature
+            if len(df_team) >= 2:
+                st.subheader("🤖 Previsione ML punti prossima partita (avanzata)")
+                df_team_sorted['GameNumber'] = range(len(df_team_sorted))
+                features = ['GameNumber', 'AST', 'REB', 'FG_PCT', 'FG3_PCT', 'FT_PCT']
+                X = df_team_sorted[features].fillna(0)
+                y = df_team_sorted['PTS']
+                model = LinearRegression().fit(X, y)
+                next_game_features = np.array([[len(df_team_sorted),
+                                                df_team_sorted['AST'].mean(),
+                                                df_team_sorted['REB'].mean(),
+                                                df_team_sorted['FG_PCT'].mean(),
+                                                df_team_sorted['FG3_PCT'].mean(),
+                                                df_team_sorted['FT_PCT'].mean()]])
+                prediction = model.predict(next_game_features)[0]
+                st.metric("📈 Previsione avanzata PTS", f"{prediction:.1f} PTS")
 
-        # Formattiamo le percentuali di tiro in formato %
-        df_team_formatted = df_team.copy()
-        for col in ['FG_PCT', 'FG3_PCT', 'FT_PCT']:
-            if col in df_team_formatted.columns:
-                df_team_formatted[col] = (df_team_formatted[col] * 100).round(1).astype(str) + '%'
+            # 📊 Heatmap Tiri
+            st.subheader("📈 Heatmap tiri (Regular Season)")
+            for season in selected_seasons:
+                shotchart = load_shot_chart(player_id, season, team_abbr)
+                if not shotchart.empty:
+                    fig, ax = plt.subplots(figsize=(6, 5))
+                    made = shotchart[shotchart['SHOT_MADE_FLAG'] == 1]
+                    missed = shotchart[shotchart['SHOT_MADE_FLAG'] == 0]
+                    ax.scatter(made['LOC_X'], made['LOC_Y'], c='green', label='Canestri', s=10)
+                    ax.scatter(missed['LOC_X'], missed['LOC_Y'], c='red', label='Errori', s=10, alpha=0.5)
+                    ax.legend()
+                    ax.set_title(f"Heatmap Tiri - {season}")
+                    ax.axis('off')
+                    st.pyplot(fig)
+                else:
+                    st.info(f"Nessun dato tiri disponibile per la stagione {season}.")
 
-        st.dataframe(df_team_formatted[['GAME_DATE', 'PTS', 'AST', 'REB', 'FG_PCT', 'FG3_PCT', 'FT_PCT']])
+            # 📋 Dettaglio partite
+            st.subheader("📋 Dettaglio partite vs " + team_name)
+            df_team_formatted = df_team.copy()
+            for col in ['FG_PCT', 'FG3_PCT', 'FT_PCT']:
+                if col in df_team_formatted.columns:
+                    df_team_formatted[col] = (df_team_formatted[col] * 100).round(1).astype(str) + '%'
+            st.dataframe(df_team_formatted[['GAME_DATE', 'PTS', 'AST', 'REB', 'FG_PCT', 'FG3_PCT', 'FT_PCT']])
 
-        csv = df_team.to_csv(index=False).encode('utf-8')
-        st.download_button(f"📥 Scarica dati CSV per {player_name}", csv, f"{player_name}_vs_{team_name}.csv", "text/csv")
+            csv = df_team.to_csv(index=False).encode('utf-8')
+            st.download_button(f"📥 Scarica dati CSV per {player_name}", csv, f"{player_name}_vs_{team_name}.csv", "text/csv")
 
-st.success("✅ Dashboard aggiornata e funzionante in modalità Live con Multi-Player e ML!")
+    # 📊 Confronto multiplo migliorato per ogni metrica
+    for metric, data in comparison_data.items():
+        if data:
+            st.subheader(f"📊 Confronto {metric} Giocatori")
+            fig, ax = plt.subplots(figsize=(8, 4))
+            players = list(data.keys())
+            values = list(data.values())
+            ax.bar(players, values, color='skyblue')
+            ax.set_ylabel(metric)
+            ax.set_title(f"Confronto {metric} vs {team_name}")
+            st.pyplot(fig)
+
+st.success("✅ Dashboard aggiornata: trend, ML avanzato, confronto completo e multi-fonte pronto!")
