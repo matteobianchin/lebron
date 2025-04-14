@@ -1,9 +1,11 @@
 streamlit
 pandas
-matplotlib
-nba_api
-scikit-learn
-requests
 numpy
-beautifulsoup4
-lxml
+scikit-learn
+xgboost
+shap
+matplotlib
+seaborn
+joblib
+nba_api
+gunicorn  # solo se usi Heroku
