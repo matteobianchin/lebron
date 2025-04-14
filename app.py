@@ -4,7 +4,63 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 from nba_api.stats.endpoints import playergamelog, teamdashboardbygeneralsplits, shotchartdetail
-from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import LinearRegression# nba-analytics-app/app.py
+
+import streamlit as st
+import pandas as pd
+import joblib
+import shap
+import matplotlib.pyplot as plt
+from utils import load_data, load_model, preprocess_input
+
+# Configurazione pagina
+st.set_page_config(page_title="NBA Player Analytics", layout="wide")
+
+# Titolo app
+st.title("🏀 NBA Player Analytics: LeBron James Focus")
+st.markdown("Previsione punti, rimbalzi e assist + spiegazioni model interpretability.")
+
+# Caricamento dati e modelli
+data = load_data()
+rf_model = load_model('models/random_forest.pkl')
+xgb_model = load_model('models/xgboost.pkl')
+
+# Selezione squadra avversaria
+opponents = data['opponent'].unique().tolist()
+selected_team = st.selectbox("Seleziona la squadra avversaria:", opponents)
+
+# Filtra dati per squadra selezionata
+filtered_data = data[data['opponent'] == selected_team]
+
+# Mostra dati recenti
+st.subheader("Statistiche recenti contro " + selected_team)
+st.dataframe(filtered_data.tail(5))
+
+# Previsione
+st.subheader("📊 Previsione della prossima partita")
+input_data = preprocess_input(filtered_data)
+
+if st.button("Genera previsione"):
+    rf_pred = rf_model.predict(input_data)
+    xgb_pred = xgb_model.predict(input_data)
+
+    st.write(f"**Random Forest Prediction:** {rf_pred[0]:.1f} punti previsti")
+    st.write(f"**XGBoost Prediction:** {xgb_pred[0]:.1f} punti previsti")
+
+    # Spiegazione con SHAP
+    st.subheader("🔍 Interpretazione modello (Random Forest)")
+    explainer = shap.TreeExplainer(rf_model)
+    shap_values = explainer.shap_values(input_data)
+
+    # Visualizzazione SHAP (summary plot)
+    fig, ax = plt.subplots()
+    shap.summary_plot(shap_values, input_data, plot_type="bar", show=False)
+    st.pyplot(fig)
+
+# Footer
+st.markdown("---")
+st.markdown("App sviluppata per analisi approfondita delle performance NBA ✨")
+
 from datetime import datetime
 import numpy as np
 
